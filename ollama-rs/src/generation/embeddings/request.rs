@@ -60,6 +60,8 @@ pub struct GenerateEmbeddingsRequest {
     pub options: Option<ModelOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub keep_alive: Option<KeepAlive>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<u32>,
 }
 
 impl GenerateEmbeddingsRequest {
@@ -85,6 +87,11 @@ impl GenerateEmbeddingsRequest {
         self.truncate = Some(truncate);
         self
     }
+
+    pub fn dimensions(mut self, dimensions: u32) -> Self {
+        self.dimensions = Some(dimensions);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -103,6 +110,7 @@ mod tests {
         assert_eq!(request.input, parsed_request.input);
         assert_eq!(request.truncate, parsed_request.truncate);
         assert_eq!(request.keep_alive, parsed_request.keep_alive);
+        assert_eq!(request.dimensions, parsed_request.dimensions);
     }
 
     #[test]
@@ -117,5 +125,6 @@ mod tests {
         assert_eq!(request.input, parsed_request.input);
         assert_eq!(request.truncate, parsed_request.truncate);
         assert_eq!(request.keep_alive, parsed_request.keep_alive);
+        assert_eq!(request.dimensions, parsed_request.dimensions);
     }
 }

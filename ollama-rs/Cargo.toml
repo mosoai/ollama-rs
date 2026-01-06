@@ -1,6 +1,6 @@
 [package]
 name = "ollama-rs"
-version.workspace = true
+version = "0.3.3"
 edition = "2021"
 license-file = "../LICENSE.md"
 description = "A Rust library for interacting with the Ollama API"
@@ -38,7 +38,7 @@ html2md = { version = "0.2.15", optional = true }
 static_assertions = "1.1.0"
 modelfile = { version = "0.3.1", optional = true }
 
-ollama-rs-macros = { workspace = true, optional = true }
+ollama-rs-macros = { path = "../ollama-rs-macros", optional = true }
 
 [features]
 default = ["reqwest/default-tls"]

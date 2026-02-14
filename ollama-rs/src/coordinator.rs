@@ -139,16 +139,41 @@ impl<C: ChatHistory> Coordinator<C> {
                     return Err(crate::error::ToolCallError::UnknownToolName.into());
                 };
 
-                let resp = tool
+                let tool_resp = tool
                     .call(call.function.arguments)
                     .await
                     .map_err(crate::error::ToolCallError::InternalToolError)?;
 
                 if self.debug {
-                    eprintln!("Tool response: {}", &resp);
+                    eprintln!("Tool response: {}", &tool_resp);
                 }
 
-                self.history.push(ChatMessage::tool(resp))
+                // Check for HITL pause marker - if found, return early without recursing
+                // This allows the caller to handle the HITL pause
+                if let Ok(resp_value) = serde_json::from_str::<serde_json::Value>(&tool_resp) {
+                    if resp_value.get("_hitl_pause").and_then(|v| v.as_bool()).unwrap_or(false) {
+                        if self.debug {
+                            eprintln!("HITL pause detected, returning tool response without recursion");
+                        }
+                        // Return the tool response as the content, embedding tool call info
+                        let hitl_response = ChatMessageResponse {
+                            message: ChatMessage {
+                                role: MessageRole::Assistant,
+                                content: tool_resp.clone(),
+                                tool_calls: vec![],
+                                images: None,
+                                thinking: None,
+                            },
+                            model: self.model.clone(),
+                            created_at: String::new(),
+                            done: true,
+                            final_data: None,
+                        };
+                        return Ok(hitl_response);
+                    }
+                }
+
+                self.history.push(ChatMessage::tool(tool_resp))
             }
 
             // recurse

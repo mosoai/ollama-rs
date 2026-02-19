@@ -168,6 +168,7 @@ impl<C: ChatHistory> Coordinator<C> {
                             created_at: String::new(),
                             done: true,
                             final_data: None,
+                            logprobs: None,
                         };
                         return Ok(hitl_response);
                     }

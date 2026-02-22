@@ -151,9 +151,15 @@ impl<C: ChatHistory> Coordinator<C> {
                 // Check for HITL pause marker - if found, return early without recursing
                 // This allows the caller to handle the HITL pause
                 if let Ok(resp_value) = serde_json::from_str::<serde_json::Value>(&tool_resp) {
-                    if resp_value.get("_hitl_pause").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    if resp_value
+                        .get("_hitl_pause")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false)
+                    {
                         if self.debug {
-                            eprintln!("HITL pause detected, returning tool response without recursion");
+                            eprintln!(
+                                "HITL pause detected, returning tool response without recursion"
+                            );
                         }
                         // Return the tool response as the content, embedding tool call info
                         let hitl_response = ChatMessageResponse {
@@ -163,6 +169,7 @@ impl<C: ChatHistory> Coordinator<C> {
                                 tool_calls: vec![],
                                 images: None,
                                 thinking: None,
+                                name: None,
                             },
                             model: self.model.clone(),
                             created_at: String::new(),
@@ -174,7 +181,8 @@ impl<C: ChatHistory> Coordinator<C> {
                     }
                 }
 
-                self.history.push(ChatMessage::tool(tool_resp))
+                self.history
+                    .push(ChatMessage::tool_with_name(&call.function.name, tool_resp))
             }
 
             // recurse

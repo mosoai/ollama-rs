@@ -90,8 +90,8 @@ impl ToolInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ToolType {
-    #[serde(rename_all(deserialize = "PascalCase"))]
     Function,
 }
 
@@ -115,4 +115,72 @@ pub struct ToolCallFunction {
     // FIXME
     #[serde(alias = "parameters")]
     pub arguments: Value,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tool_type_serializes_to_lowercase() {
+        let tool_type = ToolType::Function;
+        let json = serde_json::to_string(&tool_type).unwrap();
+        assert_eq!(json, "\"function\"");
+    }
+
+    #[test]
+    fn test_tool_type_deserializes_from_lowercase() {
+        let tool_type: ToolType = serde_json::from_str("\"function\"").unwrap();
+        assert!(matches!(tool_type, ToolType::Function));
+    }
+
+    #[test]
+    fn test_tool_info_serializes_type_correctly() {
+        // Use serde_json to create a minimal schema
+        let schema_value = serde_json::json!({"type": "object"});
+        let parameters: Schema = serde_json::from_value(schema_value).unwrap();
+
+        let tool_info = ToolInfo {
+            tool_type: ToolType::Function,
+            function: ToolFunctionInfo {
+                name: "test_tool".to_string(),
+                description: "A test tool".to_string(),
+                parameters,
+            },
+        };
+        let json = serde_json::to_string(&tool_info).unwrap();
+        assert!(json.contains("\"type\":\"function\""));
+    }
+
+    #[test]
+    fn test_tool_info_matches_ollama_api_format() {
+        // Verify the JSON structure matches Ollama API:
+        // { "type": "function", "function": { "name": "...", "description": "...", "parameters": {...} } }
+        let schema_value = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string",
+                    "description": "The city to get the weather for"
+                }
+            },
+            "required": ["city"]
+        });
+        let parameters: Schema = serde_json::from_value(schema_value).unwrap();
+
+        let tool_info = ToolInfo {
+            tool_type: ToolType::Function,
+            function: ToolFunctionInfo {
+                name: "get_weather".to_string(),
+                description: "Get the weather in a given city".to_string(),
+                parameters,
+            },
+        };
+
+        // Verify structure
+        let json = serde_json::to_value(&tool_info).unwrap();
+        assert_eq!(json["type"], "function"); // lowercase, not "Function"
+        assert_eq!(json["function"]["name"], "get_weather");
+        assert_eq!(json["function"]["description"], "Get the weather in a given city");
+    }
 }

@@ -256,6 +256,8 @@ pub struct ChatMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub images: Option<Vec<Image>>,
     pub thinking: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 impl ChatMessage {
@@ -266,6 +268,7 @@ impl ChatMessage {
             tool_calls: vec![],
             images: None,
             thinking: None,
+            name: None,
         }
     }
 
@@ -283,6 +286,17 @@ impl ChatMessage {
 
     pub fn tool(content: String) -> Self {
         Self::new(MessageRole::Tool, content)
+    }
+
+    pub fn tool_with_name(name: &str, content: String) -> Self {
+        Self {
+            role: MessageRole::Tool,
+            content,
+            tool_calls: vec![],
+            images: None,
+            thinking: None,
+            name: Some(name.to_string()),
+        }
     }
 
     pub fn with_images(mut self, images: Vec<Image>) -> Self {
@@ -310,4 +324,54 @@ pub enum MessageRole {
     System,
     #[serde(rename = "tool")]
     Tool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tool_message_without_name() {
+        let msg = ChatMessage::tool("{\"result\": 42}".to_string());
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains("\"role\":\"tool\""));
+        assert!(!json.contains("\"name\""));
+    }
+
+    #[test]
+    fn test_tool_message_with_name() {
+        let msg = ChatMessage::tool_with_name("get_weather", "{\"temperature\": 18}".to_string());
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains("\"role\":\"tool\""));
+        assert!(json.contains("\"name\":\"get_weather\""));
+        assert!(json.contains("\"content\":\"{\\\"temperature\\\": 18}\""));
+    }
+
+    #[test]
+    fn test_tool_message_name_can_be_deserialized() {
+        let json = r#"{"role":"tool","name":"get_weather","content":"{\"temperature\": 18}"}"#;
+        let msg: ChatMessage = serde_json::from_str(json).unwrap();
+        assert_eq!(msg.role, MessageRole::Tool);
+        assert_eq!(msg.name, Some("get_weather".to_string()));
+        assert_eq!(msg.content, "{\"temperature\": 18}");
+    }
+
+    #[test]
+    fn test_regular_messages_skip_name_field() {
+        let msg = ChatMessage::user("Hello".to_string());
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(!json.contains("\"name\""));
+    }
+
+    #[test]
+    fn test_tool_message_matches_ollama_api_format() {
+        // Verify the JSON structure matches Ollama API for tool result messages:
+        // { "role": "tool", "name": "get_weather", "content": "{\"temperature\": 18}" }
+        let msg = ChatMessage::tool_with_name("get_weather", r#"{"temperature": 18}"#.to_string());
+        let json = serde_json::to_value(&msg).unwrap();
+
+        assert_eq!(json["role"], "tool");
+        assert_eq!(json["name"], "get_weather");
+        assert_eq!(json["content"], r#"{"temperature": 18}"#);
+    }
 }

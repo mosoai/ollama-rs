@@ -63,6 +63,77 @@ impl<T: Tool> ToolHolder for T {
     }
 }
 
+/// A dynamic tool holder that wraps a closure for runtime-discovered tools.
+///
+/// This enables registering tools whose names and descriptions are not known at compile time,
+/// such as MCP (Model Context Protocol) tools discovered from external servers.
+pub struct DynamicToolHolder<F, Fut>
+where
+    F: FnMut(Value) -> Fut + Send + Sync,
+    Fut: Future<Output = Result<String>> + Send + Sync,
+{
+    handler: F,
+}
+
+impl<F, Fut> DynamicToolHolder<F, Fut>
+where
+    F: FnMut(Value) -> Fut + Send + Sync,
+    Fut: Future<Output = Result<String>> + Send + Sync,
+{
+    /// Create a new dynamic tool holder with the given handler closure.
+    pub fn new(handler: F) -> Self {
+        Self { handler }
+    }
+}
+
+impl<F, Fut> ToolHolder for DynamicToolHolder<F, Fut>
+where
+    F: FnMut(Value) -> Fut + Send + Sync,
+    Fut: Future<Output = Result<String>> + Send + Sync,
+{
+    fn call(
+        &mut self,
+        parameters: Value,
+    ) -> Pin<Box<dyn Future<Output = Result<String>> + '_ + Send + Sync>> {
+        Box::pin((self.handler)(parameters))
+    }
+}
+
+impl ToolFunctionInfo {
+    /// Create a ToolFunctionInfo from dynamic parameters.
+    ///
+    /// This is useful for runtime-discovered tools (like MCP tools) where
+    /// the name and description are not known at compile time.
+    pub fn from_dynamic(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        parameters: Schema,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            parameters,
+        }
+    }
+}
+
+impl ToolInfo {
+    /// Create a ToolInfo from dynamic parameters.
+    ///
+    /// This is useful for runtime-discovered tools (like MCP tools) where
+    /// the name and description are not known at compile time.
+    pub fn from_dynamic(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        parameters: Schema,
+    ) -> Self {
+        Self {
+            tool_type: ToolType::Function,
+            function: ToolFunctionInfo::from_dynamic(name, description, parameters),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ToolInfo {
     #[serde(rename = "type")]

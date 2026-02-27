@@ -4,12 +4,14 @@ use crate::{
     generation::{
         chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponse, MessageRole},
         parameters::{FormatType, KeepAlive, ThinkType},
-        tools::{Tool, ToolHolder, ToolInfo},
+        tools::{DynamicToolHolder, Tool, ToolHolder, ToolInfo},
     },
     history::ChatHistory,
     models::ModelOptions,
     Ollama,
 };
+use schemars::Schema;
+use std::future::Future;
 
 /// A coordinator for managing chat interactions and tool usage.
 ///
@@ -59,6 +61,62 @@ impl<C: ChatHistory> Coordinator<C> {
     pub fn add_tool<T: Tool + 'static>(mut self, tool: T) -> Self {
         self.tool_infos.push(ToolInfo::new::<_, T>());
         self.tools.insert(T::name().to_string(), Box::new(tool));
+        self
+    }
+
+    /// Add a dynamically discovered tool to the coordinator.
+    ///
+    /// This method enables registering tools whose names, descriptions, and schemas
+    /// are not known at compile time, such as MCP (Model Context Protocol) tools
+    /// discovered from external servers at runtime.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The tool name (will be used by the LLM to call this tool)
+    /// * `description` - A description of what the tool does (shown to the LLM)
+    /// * `parameters` - The JSON Schema for the tool's input parameters
+    /// * `handler` - An async closure that takes `Value` parameters and returns `Result<String>`
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use schemars::Schema;
+    /// use serde_json::json;
+    ///
+    /// let schema: Schema = serde_json::from_value(json!({
+    ///     "type": "object",
+    ///     "properties": {
+    ///         "path": { "type": "string", "description": "File path to read" }
+    ///     },
+    ///     "required": ["path"]
+    /// })).unwrap();
+    ///
+    /// coordinator.add_dynamic_tool(
+    ///     "filesystem.read_file",
+    ///     "Read a file from the filesystem",
+    ///     schema,
+    ///     |params| async move {
+    ///         let path = params["path"].as_str().unwrap();
+    ///         Ok(std::fs::read_to_string(path)?)
+    ///     }
+    /// );
+    /// ```
+    pub fn add_dynamic_tool<F, Fut>(
+        mut self,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        parameters: Schema,
+        handler: F,
+    ) -> Self
+    where
+        F: FnMut(serde_json::Value) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = crate::generation::tools::Result<String>> + Send + Sync + 'static,
+    {
+        let name_str = name.into();
+        self.tool_infos
+            .push(ToolInfo::from_dynamic(&name_str, description, parameters));
+        self.tools
+            .insert(name_str, Box::new(DynamicToolHolder::new(handler)));
         self
     }
 

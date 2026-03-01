@@ -48,6 +48,39 @@ fn serde_keep_alive_until() {
 }
 
 #[test]
+fn serde_keep_alive_positive_integers_as_seconds() {
+    // Test positive integer 60 deserializes to KeepAlive::Until { time: 60, unit: Seconds }
+    let parsed: KeepAlive = serde_json::from_str("60").unwrap();
+    assert_eq!(
+        parsed,
+        KeepAlive::Until {
+            time: 60,
+            unit: TimeUnit::Seconds
+        }
+    );
+
+    // Test larger integer
+    let parsed: KeepAlive = serde_json::from_str("3600").unwrap();
+    assert_eq!(
+        parsed,
+        KeepAlive::Until {
+            time: 3600,
+            unit: TimeUnit::Seconds
+        }
+    );
+
+    // Test integer 1
+    let parsed: KeepAlive = serde_json::from_str("1").unwrap();
+    assert_eq!(
+        parsed,
+        KeepAlive::Until {
+            time: 1,
+            unit: TimeUnit::Seconds
+        }
+    );
+}
+
+#[test]
 fn serde_format_type_json() {
     let format_type = FormatType::Json;
     let json = serde_json::to_vec(&format_type).unwrap();

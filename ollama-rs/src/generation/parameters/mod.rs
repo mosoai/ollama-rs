@@ -142,7 +142,7 @@ impl<'de> Deserialize<'de> for KeepAlive {
             type Value = KeepAlive;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("i8 value (-1 or 0), or string like \"30s\", \"5m\", \"2h\"")
+                formatter.write_str("an integer (-1, 0, or positive seconds), or a duration string like \"30s\", \"5m\", \"2h\"")
             }
 
             fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
@@ -152,9 +152,13 @@ impl<'de> Deserialize<'de> for KeepAlive {
                 match v {
                     -1 => Ok(KeepAlive::Indefinitely),
                     0 => Ok(KeepAlive::UnloadOnCompletion),
+                    n if n > 0 => Ok(KeepAlive::Until {
+                        time: n as u64,
+                        unit: TimeUnit::Seconds,
+                    }),
                     _ => Err(E::invalid_value(
                         serde::de::Unexpected::Signed(v as i64),
-                        &"0 or -1",
+                        &"a non-negative integer or -1",
                     )),
                 }
             }
@@ -166,9 +170,13 @@ impl<'de> Deserialize<'de> for KeepAlive {
                 match v {
                     -1 => Ok(KeepAlive::Indefinitely),
                     0 => Ok(KeepAlive::UnloadOnCompletion),
+                    n if n > 0 => Ok(KeepAlive::Until {
+                        time: n as u64,
+                        unit: TimeUnit::Seconds,
+                    }),
                     _ => Err(E::invalid_value(
                         serde::de::Unexpected::Signed(v),
-                        &"0 or -1",
+                        &"a non-negative integer or -1",
                     )),
                 }
             }
@@ -177,13 +185,12 @@ impl<'de> Deserialize<'de> for KeepAlive {
             where
                 E: serde::de::Error,
             {
-                if v == 0 {
-                    Ok(KeepAlive::UnloadOnCompletion)
-                } else {
-                    Err(E::invalid_value(
-                        serde::de::Unexpected::Unsigned(v),
-                        &"0 or -1",
-                    ))
+                match v {
+                    0 => Ok(KeepAlive::UnloadOnCompletion),
+                    n => Ok(KeepAlive::Until {
+                        time: n,
+                        unit: TimeUnit::Seconds,
+                    }),
                 }
             }
 

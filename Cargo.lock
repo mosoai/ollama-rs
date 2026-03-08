@@ -1565,7 +1565,7 @@ dependencies = [
 
 [[package]]
 name = "ollama-rs"
-version = "0.3.3"
+version = "0.3.4-custom.1"
 dependencies = [
  "async-stream",
  "base64",
